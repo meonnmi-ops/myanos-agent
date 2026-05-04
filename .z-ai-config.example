@@ -1,0 +1,4 @@
+{
+  "baseUrl": "https://your-api-gateway.com/v1",
+  "apiKey": "your-api-key-here"
+}

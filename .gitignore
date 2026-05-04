@@ -19,6 +19,9 @@ dist/
 
 # Debug
 npm-debug.log*
+
+# AI SDK Config (contains API keys)
+.z-ai-config
 yarn-debug.log*
 yarn-error.log*
 
