@@ -4,6 +4,9 @@ import fs from 'fs';
 import path from 'path';
 import os from 'os';
 
+// z.ai SDK auto-discovers config from /etc/.z-ai-config on this server
+// No API key needed from the user — Super Z is built in!
+
 const SYSTEM_PROMPT = `You are MyanOS Agent, a powerful AI assistant specialized in three capabilities:
 
 1. **Shell Commands (shell_exec)**: Execute shell commands on a Termux Android environment via a secure tunnel. You can run any Linux command available in Termux (ls, cat, mkdir, python3, node, git, etc.). Always explain what you're about to do before running commands.
@@ -74,8 +77,6 @@ const TOOL_DEFINITIONS = [
 interface ChatRequestBody {
   messages: Array<{ role: string; content: string }>;
   tunnelUrl: string;
-  apiKey?: string;
-  baseUrl?: string;
 }
 
 async function executeToolCall(
@@ -125,20 +126,10 @@ async function executeToolCall(
 export async function POST(request: NextRequest) {
   try {
     const body: ChatRequestBody = await request.json();
-    const { messages, tunnelUrl, apiKey, baseUrl } = body;
+    const { messages, tunnelUrl } = body;
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    let ai: any;
-
-    if (apiKey && baseUrl) {
-      // Write config from Settings UI — no manual file editing needed!
-      const configPath = path.join(os.homedir(), '.z-ai-config');
-      fs.writeFileSync(configPath, JSON.stringify({ baseUrl, apiKey }, null, 2));
-      ai = await ZAI.create();
-    } else {
-      // Fallback: try loading existing .z-ai-config file
-      ai = await ZAI.create();
-    }
+    // Super Z is built in — auto-discovers z.ai config from server
+    const ai = await ZAI.create();
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const currentMessages: any[] = [
