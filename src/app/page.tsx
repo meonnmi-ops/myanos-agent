@@ -68,17 +68,23 @@ export default function Home() {
     isProcessing,
     currentTaskSteps,
     tunnelUrl,
+    apiKey,
+    baseUrl,
     addMessage,
     updateMessage,
     setProcessing,
     setTaskSteps,
     setTunnelUrl,
+    setApiKey,
+    setBaseUrl,
     clearChat,
   } = useAgentStore();
 
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [clearOpen, setClearOpen] = useState(false);
   const [settingsUrl, setSettingsUrl] = useState(tunnelUrl);
+  const [settingsApiKey, setSettingsApiKey] = useState(apiKey);
+  const [settingsBaseUrl, setSettingsBaseUrl] = useState(baseUrl);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
@@ -90,10 +96,12 @@ export default function Home() {
     scrollToBottom();
   }, [messages, isProcessing, currentTaskSteps, scrollToBottom]);
 
-  // Sync settings input with store
+  // Sync settings inputs with store
   useEffect(() => {
     setSettingsUrl(tunnelUrl);
-  }, [tunnelUrl, settingsOpen]);
+    setSettingsApiKey(apiKey);
+    setSettingsBaseUrl(baseUrl);
+  }, [tunnelUrl, apiKey, baseUrl, settingsOpen]);
 
   const handleSend = useCallback(
     async (content: string) => {
@@ -128,6 +136,8 @@ export default function Home() {
           body: JSON.stringify({
             messages: [...chatMessages, { role: 'user', content }],
             tunnelUrl,
+            apiKey,
+            baseUrl,
           }),
         });
 
@@ -158,13 +168,15 @@ export default function Home() {
         setProcessing(false);
       }
     },
-    [addMessage, updateMessage, setProcessing, setTaskSteps, tunnelUrl]
+    [addMessage, updateMessage, setProcessing, setTaskSteps, tunnelUrl, apiKey, baseUrl]
   );
 
   const handleSaveSettings = useCallback(() => {
     setTunnelUrl(settingsUrl.trim());
+    setApiKey(settingsApiKey.trim());
+    setBaseUrl(settingsBaseUrl.trim());
     setSettingsOpen(false);
-  }, [settingsUrl, setTunnelUrl]);
+  }, [settingsUrl, settingsApiKey, settingsBaseUrl, setTunnelUrl, setApiKey, setBaseUrl]);
 
   const handleClearChat = useCallback(() => {
     clearChat();
@@ -172,6 +184,7 @@ export default function Home() {
   }, [clearChat]);
 
   const hasTunnel = tunnelUrl.length > 0;
+  const hasApiConfig = apiKey.length > 0 && baseUrl.length > 0;
 
   return (
     <TooltipProvider delayDuration={300}>
@@ -187,13 +200,13 @@ export default function Home() {
             <div>
               <h1 className="text-sm font-semibold">MyanOS Agent</h1>
               <div className="flex items-center gap-1.5">
-                {hasTunnel ? (
+                {hasApiConfig ? (
                   <Wifi className="h-3 w-3 text-emerald-500" />
                 ) : (
                   <WifiOff className="h-3 w-3 text-zinc-500" />
                 )}
                 <span className="text-[11px] text-muted-foreground">
-                  {hasTunnel ? 'Tunnel connected' : 'No tunnel configured'}
+                  {hasApiConfig ? 'AI ready' : 'Set API key in Settings'}
                 </span>
               </div>
             </div>
@@ -207,19 +220,39 @@ export default function Home() {
                   <Settings className="h-4 w-4" />
                 </Button>
               </DialogTrigger>
-              <DialogContent>
+              <DialogContent className="max-w-md">
                 <DialogHeader>
-                  <DialogTitle>Tunnel Settings</DialogTitle>
+                  <DialogTitle>Settings</DialogTitle>
                   <DialogDescription>
-                    Enter your Termux tunnel URL to enable shell execution and MMC compilation.
+                    Configure your AI API and Termux tunnel connection.
                   </DialogDescription>
                 </DialogHeader>
                 <div className="space-y-4 pt-2">
-                  <Input
-                    placeholder="https://your-tunnel-url.onrender.com"
-                    value={settingsUrl}
-                    onChange={(e) => setSettingsUrl(e.target.value)}
-                  />
+                  <div className="space-y-2">
+                    <label className="text-xs font-medium text-muted-foreground">API Base URL</label>
+                    <Input
+                      placeholder="https://your-api-gateway.com/v1"
+                      value={settingsBaseUrl}
+                      onChange={(e) => setSettingsBaseUrl(e.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-xs font-medium text-muted-foreground">API Key</label>
+                    <Input
+                      type="password"
+                      placeholder="sk-... or your API key"
+                      value={settingsApiKey}
+                      onChange={(e) => setSettingsApiKey(e.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-xs font-medium text-muted-foreground">Tunnel URL (for Shell / MMC)</label>
+                    <Input
+                      placeholder="https://your-tunnel-url.trycloudflare.com"
+                      value={settingsUrl}
+                      onChange={(e) => setSettingsUrl(e.target.value)}
+                    />
+                  </div>
                   <div className="flex justify-end gap-2">
                     <Button variant="outline" onClick={() => setSettingsOpen(false)}>
                       Cancel

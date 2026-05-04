@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import ZAI from 'z-ai-web-dev-sdk';
+import fs from 'fs';
+import path from 'path';
+import os from 'os';
 
 const SYSTEM_PROMPT = `You are MyanOS Agent, a powerful AI assistant specialized in three capabilities:
 
@@ -71,6 +74,8 @@ const TOOL_DEFINITIONS = [
 interface ChatRequestBody {
   messages: Array<{ role: string; content: string }>;
   tunnelUrl: string;
+  apiKey?: string;
+  baseUrl?: string;
 }
 
 async function executeToolCall(
@@ -120,9 +125,20 @@ async function executeToolCall(
 export async function POST(request: NextRequest) {
   try {
     const body: ChatRequestBody = await request.json();
-    const { messages, tunnelUrl } = body;
+    const { messages, tunnelUrl, apiKey, baseUrl } = body;
 
-    const ai = await ZAI.create();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let ai: any;
+
+    if (apiKey && baseUrl) {
+      // Write config from Settings UI — no manual file editing needed!
+      const configPath = path.join(os.homedir(), '.z-ai-config');
+      fs.writeFileSync(configPath, JSON.stringify({ baseUrl, apiKey }, null, 2));
+      ai = await ZAI.create();
+    } else {
+      // Fallback: try loading existing .z-ai-config file
+      ai = await ZAI.create();
+    }
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const currentMessages: any[] = [
