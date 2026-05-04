@@ -15,6 +15,9 @@ import {
   FolderCode,
   Database,
   Zap,
+  Key,
+  Globe,
+  ExternalLink,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -68,17 +71,23 @@ export default function Home() {
     isProcessing,
     currentTaskSteps,
     tunnelUrl,
+    apiKey,
+    baseUrl,
     addMessage,
     updateMessage,
     setProcessing,
     setTaskSteps,
     setTunnelUrl,
+    setApiKey,
+    setBaseUrl,
     clearChat,
   } = useAgentStore();
 
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [clearOpen, setClearOpen] = useState(false);
   const [settingsUrl, setSettingsUrl] = useState(tunnelUrl);
+  const [settingsApiKey, setSettingsApiKey] = useState(apiKey);
+  const [settingsBaseUrl, setSettingsBaseUrl] = useState(baseUrl);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
@@ -90,10 +99,11 @@ export default function Home() {
     scrollToBottom();
   }, [messages, isProcessing, currentTaskSteps, scrollToBottom]);
 
-  // Sync settings input with store
   useEffect(() => {
     setSettingsUrl(tunnelUrl);
-  }, [tunnelUrl, settingsOpen]);
+    setSettingsApiKey(apiKey);
+    setSettingsBaseUrl(baseUrl);
+  }, [tunnelUrl, apiKey, baseUrl, settingsOpen]);
 
   const handleSend = useCallback(
     async (content: string) => {
@@ -128,6 +138,8 @@ export default function Home() {
           body: JSON.stringify({
             messages: [...chatMessages, { role: 'user', content }],
             tunnelUrl,
+            apiKey,
+            baseUrl,
           }),
         });
 
@@ -158,20 +170,24 @@ export default function Home() {
         setProcessing(false);
       }
     },
-    [addMessage, updateMessage, setProcessing, setTaskSteps, tunnelUrl]
+    [addMessage, updateMessage, setProcessing, setTaskSteps, tunnelUrl, apiKey, baseUrl]
   );
 
   const handleSaveSettings = useCallback(() => {
     setTunnelUrl(settingsUrl.trim());
+    setApiKey(settingsApiKey.trim());
+    setBaseUrl(settingsBaseUrl.trim());
     setSettingsOpen(false);
-  }, [settingsUrl, setTunnelUrl]);
+  }, [settingsUrl, settingsApiKey, settingsBaseUrl, setTunnelUrl, setApiKey, setBaseUrl]);
 
   const handleClearChat = useCallback(() => {
     clearChat();
     setClearOpen(false);
   }, [clearChat]);
 
+  const hasApiConfig = apiKey.length > 0 && baseUrl.length > 0;
   const hasTunnel = tunnelUrl.length > 0;
+  const isReady = hasApiConfig;
 
   return (
     <TooltipProvider delayDuration={300}>
@@ -187,10 +203,21 @@ export default function Home() {
             <div>
               <h1 className="text-sm font-semibold">MyanOS Agent</h1>
               <div className="flex items-center gap-1.5">
-                <Zap className="h-3 w-3 text-emerald-500" />
-                <span className="text-[11px] text-muted-foreground">
-                  {hasTunnel ? 'Super Z + Tunnel connected' : 'Super Z ready'}
-                </span>
+                {isReady ? (
+                  <>
+                    <Zap className="h-3 w-3 text-emerald-500" />
+                    <span className="text-[11px] text-emerald-500">
+                      {hasTunnel ? 'AI + Tunnel ready' : 'AI ready'}
+                    </span>
+                  </>
+                ) : (
+                  <>
+                    <WifiOff className="h-3 w-3 text-zinc-500" />
+                    <span className="text-[11px] text-muted-foreground">
+                      Set API key in Settings
+                    </span>
+                  </>
+                )}
               </div>
             </div>
           </div>
@@ -203,33 +230,89 @@ export default function Home() {
                   <Settings className="h-4 w-4" />
                 </Button>
               </DialogTrigger>
-              <DialogContent className="max-w-md">
+              <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
                 <DialogHeader>
                   <DialogTitle>Settings</DialogTitle>
                   <DialogDescription>
-                    Configure your Termux tunnel to enable shell execution and MMC compilation.
-                    AI is powered by Super Z — no API key needed.
+                    Configure AI API and Termux tunnel connection.
                   </DialogDescription>
                 </DialogHeader>
-                <div className="space-y-4 pt-2">
-                  <div className="space-y-2">
-                    <label className="text-xs font-medium text-muted-foreground">
-                      Termux Tunnel URL (for Shell / MMC tools)
-                    </label>
-                    <Input
-                      placeholder="https://your-tunnel-url.trycloudflare.com"
-                      value={settingsUrl}
-                      onChange={(e) => setSettingsUrl(e.target.value)}
-                    />
-                    <p className="text-[11px] text-muted-foreground">
-                      Use cloudflared, ngrok, or bore to create a tunnel from your Termux device.
-                    </p>
+                <div className="space-y-5 pt-2">
+                  {/* AI Configuration */}
+                  <div className="rounded-xl border border-emerald-600/30 bg-emerald-950/20 p-4 space-y-3">
+                    <div className="flex items-center gap-2 text-sm font-medium text-emerald-400">
+                      <Zap className="h-4 w-4" />
+                      AI Configuration (Required)
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-xs font-medium text-muted-foreground">
+                        API Base URL
+                      </label>
+                      <div className="flex items-center gap-2">
+                        <Globe className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                        <Input
+                          placeholder="https://generativelanguage.googleapis.com/v1beta/openai/"
+                          value={settingsBaseUrl}
+                          onChange={(e) => setSettingsBaseUrl(e.target.value)}
+                          className="text-xs"
+                        />
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-xs font-medium text-muted-foreground">
+                        API Key
+                      </label>
+                      <div className="flex items-center gap-2">
+                        <Key className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                        <Input
+                          type="password"
+                          placeholder="AIza..."
+                          value={settingsApiKey}
+                          onChange={(e) => setSettingsApiKey(e.target.value)}
+                          className="text-xs"
+                        />
+                      </div>
+                    </div>
+                    <a
+                      href="https://aistudio.google.com/app/apikey"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-1.5 text-[11px] text-emerald-400 hover:text-emerald-300 transition-colors"
+                    >
+                      <ExternalLink className="h-3 w-3" />
+                      Get free Gemini API key (Google AI Studio)
+                    </a>
                   </div>
+
+                  {/* Tunnel Configuration */}
+                  <div className="rounded-xl border border-border bg-secondary/20 p-4 space-y-3">
+                    <div className="flex items-center gap-2 text-sm font-medium">
+                      <Wifi className="h-4 w-4" />
+                      Tunnel (Optional — for Shell / MMC)
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-xs font-medium text-muted-foreground">
+                        Termux Tunnel URL
+                      </label>
+                      <Input
+                        placeholder="https://your-tunnel-url.trycloudflare.com"
+                        value={settingsUrl}
+                        onChange={(e) => setSettingsUrl(e.target.value)}
+                        className="text-xs"
+                      />
+                      <p className="text-[11px] text-muted-foreground">
+                        Use <code className="text-emerald-400">cloudflared tunnel --url http://localhost:3000</code> on Termux
+                      </p>
+                    </div>
+                  </div>
+
                   <div className="flex justify-end gap-2">
                     <Button variant="outline" onClick={() => setSettingsOpen(false)}>
                       Cancel
                     </Button>
-                    <Button onClick={handleSaveSettings}>Save</Button>
+                    <Button onClick={handleSaveSettings} className="bg-emerald-600 hover:bg-emerald-700">
+                      Save
+                    </Button>
                   </div>
                 </div>
               </DialogContent>
@@ -286,9 +369,53 @@ export default function Home() {
                 <div className="space-y-2">
                   <h2 className="text-2xl font-bold">Welcome to MyanOS Agent</h2>
                   <p className="text-sm text-muted-foreground leading-relaxed">
-                    Powered by Super Z — your free, unlimited AI agent. Shell execution, MMC compiler, OneDrive integration.
+                    Free, unlimited AI agent for Termux shell execution, MMC compiler, and OneDrive.
                   </p>
                 </div>
+
+                {/* Setup card if no API config */}
+                {!isReady && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.3 }}
+                    className="w-full rounded-xl border border-emerald-600/30 bg-emerald-950/20 p-4 text-left space-y-3"
+                  >
+                    <div className="flex items-center gap-2 text-sm font-medium text-emerald-400">
+                      <Zap className="h-4 w-4" />
+                      Quick Setup (1 minute)
+                    </div>
+                    <ol className="text-xs text-muted-foreground space-y-2 list-decimal list-inside">
+                      <li>
+                        Go to{' '}
+                        <a
+                          href="https://aistudio.google.com/app/apikey"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-emerald-400 hover:underline"
+                        >
+                          Google AI Studio
+                        </a>{' '}
+                        and click <strong>"Create API Key"</strong>
+                      </li>
+                      <li>Copy the key (starts with <code className="text-emerald-400">AIza...</code>)</li>
+                      <li>
+                        Open <strong>Settings</strong> and paste it into API Key
+                      </li>
+                      <li>
+                        Set API Base URL to{' '}
+                        <code className="text-emerald-400 text-[10px]">https://generativelanguage.googleapis.com/v1beta/openai/</code>
+                      </li>
+                    </ol>
+                    <Button
+                      size="sm"
+                      className="w-full bg-emerald-600 hover:bg-emerald-700"
+                      onClick={() => setSettingsOpen(true)}
+                    >
+                      Open Settings
+                    </Button>
+                  </motion.div>
+                )}
 
                 {/* Capability cards */}
                 <div className="grid w-full grid-cols-1 gap-3 sm:grid-cols-3">
@@ -314,6 +441,7 @@ export default function Home() {
                       variant="outline"
                       size="sm"
                       onClick={() => handleSend(action.prompt)}
+                      disabled={!isReady}
                       className="gap-2"
                     >
                       {action.icon}
@@ -350,7 +478,7 @@ export default function Home() {
                     className="flex items-center gap-2 px-1"
                   >
                     <div className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-500" />
-                    <span className="text-xs text-muted-foreground">Super Z is thinking...</span>
+                    <span className="text-xs text-muted-foreground">Thinking...</span>
                   </motion.div>
                 )}
 
@@ -361,7 +489,7 @@ export default function Home() {
         </main>
 
         {/* Chat input */}
-        <ChatInput onSend={handleSend} isProcessing={isProcessing} />
+        <ChatInput onSend={handleSend} isProcessing={isProcessing} disabled={!isReady && messages.length === 0} />
       </div>
     </TooltipProvider>
   );

@@ -1,11 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import ZAI from 'z-ai-web-dev-sdk';
-import fs from 'fs';
-import path from 'path';
-import os from 'os';
-
-// z.ai SDK auto-discovers config from /etc/.z-ai-config on this server
-// No API key needed from the user — Super Z is built in!
 
 const SYSTEM_PROMPT = `You are MyanOS Agent, a powerful AI assistant specialized in three capabilities:
 
@@ -77,6 +71,8 @@ const TOOL_DEFINITIONS = [
 interface ChatRequestBody {
   messages: Array<{ role: string; content: string }>;
   tunnelUrl: string;
+  apiKey?: string;
+  baseUrl?: string;
 }
 
 async function executeToolCall(
@@ -123,13 +119,44 @@ async function executeToolCall(
   }
 }
 
+// Call OpenAI-compatible API (works with Gemini, Groq, OpenRouter, etc.)
+async function callOpenAICompatible(
+  baseUrl: string,
+  apiKey: string,
+  messages: Array<{ role: string; content: string; tool_calls?: unknown[] }>,
+  tools?: unknown[]
+): Promise<{ content: string; tool_calls: unknown[] }> {
+  const url = `${baseUrl}/chat/completions`;
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${apiKey}`,
+    },
+    body: JSON.stringify({
+      model: 'default',
+      messages,
+      tools: tools && tools.length > 0 ? tools : undefined,
+    }),
+  });
+
+  if (!response.ok) {
+    const err = await response.text();
+    throw new Error(`API ${response.status}: ${err}`);
+  }
+
+  const data = await response.json();
+  const choice = data.choices?.[0];
+  return {
+    content: choice?.message?.content || '',
+    tool_calls: choice?.message?.tool_calls || [],
+  };
+}
+
 export async function POST(request: NextRequest) {
   try {
     const body: ChatRequestBody = await request.json();
-    const { messages, tunnelUrl } = body;
-
-    // Super Z is built in — auto-discovers z.ai config from server
-    const ai = await ZAI.create();
+    const { messages, tunnelUrl, apiKey, baseUrl } = body;
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const currentMessages: any[] = [
@@ -153,38 +180,79 @@ export async function POST(request: NextRequest) {
     ];
 
     let finalContent = '';
+    let useZAI = false;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let ai: any = null;
+
+    // Determine AI backend:
+    // Priority 1: User-provided API key (works from any device)
+    // Priority 2: z.ai SDK (only works on z.ai cloud network)
+    if (apiKey && baseUrl) {
+      // User provided their own API — use OpenAI-compatible format
+      // This works with Gemini, Groq, OpenRouter, Ollama, etc.
+      useZAI = false;
+    } else {
+      // Try z.ai SDK (works on z.ai cloud, will fail on Termux)
+      try {
+        ai = await ZAI.create();
+        useZAI = true;
+      } catch {
+        useZAI = false;
+      }
+    }
 
     // Tool-calling loop (max 5 rounds)
     for (let round = 0; round < 5; round++) {
-      const completion = await ai.chat.completions.create({
-        model: 'default',
-        messages: currentMessages,
-        tools: TOOL_DEFINITIONS.length > 0 ? TOOL_DEFINITIONS : undefined,
-      });
+      let aiContent = '';
+      let aiToolCalls: unknown[] = [];
 
-      const choice = completion.choices?.[0];
-      if (!choice) {
-        finalContent = 'No response from AI model.';
+      if (useZAI && ai) {
+        // Use z.ai SDK
+        const completion = await ai.chat.completions.create({
+          model: 'default',
+          messages: currentMessages,
+          tools: TOOL_DEFINITIONS.length > 0 ? TOOL_DEFINITIONS : undefined,
+        });
+        const choice = completion.choices?.[0];
+        if (!choice) {
+          finalContent = 'No response from AI model.';
+          break;
+        }
+        aiContent = choice.message?.content || '';
+        aiToolCalls = choice.message?.tool_calls || [];
+      } else if (apiKey && baseUrl) {
+        // Use user-provided API (OpenAI-compatible)
+        const result = await callOpenAICompatible(
+          baseUrl,
+          apiKey,
+          currentMessages,
+          TOOL_DEFINITIONS.length > 0 ? TOOL_DEFINITIONS : undefined
+        );
+        aiContent = result.content;
+        aiToolCalls = result.tool_calls;
+      } else {
+        finalContent = 'No AI configured. Please go to Settings and enter your API Base URL and API Key. Get a free key from Google Gemini (ai.google.dev).';
         break;
       }
 
-      const message = choice.message;
-
       // If no tool calls, we're done
-      if (!message.tool_calls || message.tool_calls.length === 0) {
-        finalContent = message.content || '';
+      if (!aiToolCalls || aiToolCalls.length === 0) {
+        finalContent = aiContent;
         break;
       }
 
       // Add assistant message with tool calls to conversation
       currentMessages.push({
         role: 'assistant',
-        content: message.content || '',
-        tool_calls: message.tool_calls,
+        content: aiContent,
+        tool_calls: aiToolCalls,
       });
 
       // Execute each tool call
-      for (const toolCall of message.tool_calls) {
+      for (const toolCall of aiToolCalls as Array<{
+        id?: string;
+        function?: { name?: string; arguments?: string };
+      }>) {
         const tcId = toolCall.id || `tc_${Date.now()}`;
         const toolName = toolCall.function?.name || 'unknown';
         const toolArgs = toolCall.function?.arguments
