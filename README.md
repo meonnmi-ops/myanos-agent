@@ -32,6 +32,18 @@ npm run dev
 # Open http://localhost:3000
 ```
 
+### Termux (Android)
+
+On Termux (android/arm64), Turbopack is not supported. The `dev` script already uses `--webpack` mode.
+
+```bash
+git clone https://github.com/meonnmi-ops/myanos-agent.git
+cd myanos-agent
+npm install
+npm run dev
+# Open http://localhost:3000
+```
+
 ## Tools
 
 | Tool | Description | Setup |
@@ -47,21 +59,21 @@ To enable shell execution on your Android device:
 ### Option 1: Bore.pub
 ```bash
 pkg install bore
-bore local 8080 --to localhost:8080
+bore local 3000 --to localhost:3000
 # Copy the bore.pub URL to MyanOS Agent Settings
 ```
 
 ### Option 2: Cloudflare Tunnel
 ```bash
 pkg install cloudflared
-cloudflared tunnel --url http://localhost:8080
+cloudflared tunnel --url http://localhost:3000
 # Copy the trycloudflare.com URL to Settings
 ```
 
 ### Option 3: ngrok
 ```bash
 pkg install ngrok
-ngrok http 8080
+ngrok http 3000
 # Copy the ngrok URL to Settings
 ```
 
@@ -105,6 +117,12 @@ myanos-agent/
 ├── tsconfig.json
 └── next.config.mjs
 ```
+
+## Important Notes
+
+- **Termux users**: The dev server uses Webpack mode because Turbopack does not support android/arm64. This is already configured in the default `dev` script.
+- **Tunnel URL**: Set the tunnel URL in MyanOS Agent Settings (gear icon) to enable shell execution, MMC compile, and other Termux tools from the web interface.
+- **Tunnel port**: The dev server runs on port 3000, so tunnels must point to `localhost:3000`.
 
 ## License
 

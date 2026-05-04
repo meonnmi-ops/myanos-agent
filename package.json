@@ -4,7 +4,7 @@
   "private": true,
   "description": "MyanOS Agent - Manus-like Free Unlimited AI Agent Web App with Termux shell execution, MMC compiler, and OneDrive integration",
   "scripts": {
-    "dev": "next dev -p 3000",
+    "dev": "next dev -p 3000 --webpack",
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
